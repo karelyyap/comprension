@@ -4,8 +4,16 @@
 #include <iomanip>
 #include <unordered_map>
 #include <set>
+#include <cstring>
 
 using namespace std;
+
+// Hash para pares (codigo, color)
+struct PairHash {
+    size_t operator()(const pair<int, unsigned int>& p) const {
+        return hash<long long>()(((long long)p.first << 32) | p.second);
+    }
+};
 
 int main() {
     ios_base::sync_with_stdio(false);
@@ -37,30 +45,36 @@ int main() {
             mapa_base[diccionario_base[i]] = i;
         }
         
-        // LZW: diccionario mapea (codigo_anterior, color) -> nuevo_codigo
-        unordered_map<long long, int> dict_lzw;
+        // LZW: diccionario mapea secuencias a códigos
+        // Usamos pair<int, unsigned int> para (ultimo_codigo, nuevo_color)
+        unordered_map<pair<int, unsigned int>, int, PairHash> dict_lzw;
         int proximo_codigo = diccionario_base.size();
         vector<int> codigos_comprimidos;
         codigos_comprimidos.reserve(total_pixeles);
         
-        const int MAX_DICT = 1048576;
+        const int MAX_DICT = 2097152;  // 2M para mejor compresión
         
         if (total_pixeles > 0) {
             int codigo_actual = mapa_base[img[0]];
             
             for (int i = 1; i < total_pixeles; i++) {
                 unsigned int color = img[i];
-                long long clave = ((long long)codigo_actual << 32) | color;
+                pair<int, unsigned int> clave = {codigo_actual, color};
                 
-                if (dict_lzw.find(clave) != dict_lzw.end()) {
-                    codigo_actual = dict_lzw[clave];
+                auto it = dict_lzw.find(clave);
+                if (it != dict_lzw.end()) {
+                    // La secuencia ya existe, extender
+                    codigo_actual = it->second;
                 } else {
+                    // Nueva secuencia encontrada
                     codigos_comprimidos.push_back(codigo_actual);
                     
+                    // Agregar al diccionario si hay espacio
                     if (proximo_codigo < MAX_DICT) {
                         dict_lzw[clave] = proximo_codigo++;
                     }
                     
+                    // Reiniciar con el nuevo color
                     codigo_actual = mapa_base[color];
                 }
             }
@@ -68,14 +82,20 @@ int main() {
         }
         
         // Salida
-        cout << (1 + diccionario_base.size() + 1 + codigos_comprimidos.size()) << "\n";
-        cout << diccionario_base.size();
+        vector<int> salida;
+        salida.push_back(diccionario_base.size());
         for (unsigned int color : diccionario_base) {
-            cout << " " << color;
+            salida.push_back(color);
         }
-        cout << " " << codigos_comprimidos.size();
+        salida.push_back(codigos_comprimidos.size());
         for (int codigo : codigos_comprimidos) {
-            cout << " " << codigo;
+            salida.push_back(codigo);
+        }
+        
+        cout << salida.size() << "\n";
+        for (size_t i = 0; i < salida.size(); i++) {
+            cout << salida[i];
+            if (i < salida.size() - 1) cout << " ";
         }
         cout << "\n";
         
@@ -97,45 +117,56 @@ int main() {
             cin >> codigos[i];
         }
         
-        // Diccionario de descompresión
+        // Diccionario de descompresión: código -> secuencia de colores
         vector<vector<unsigned int>> dict_lzw;
-        dict_lzw.reserve(1048576);
+        dict_lzw.reserve(2097152);
         
         for (int i = 0; i < num_base; i++) {
             dict_lzw.push_back({diccionario_base[i]});
         }
         
         int pixeles_impresos = 0;
-        
-        auto imprimir_pixel = [&](unsigned int color) {
-            cout << hex << uppercase << setfill('0') << setw(8) << color;
-            pixeles_impresos++;
-            if (pixeles_impresos % m == 0) cout << "\n";
-            else cout << " ";
-        };
+        bool primera_linea = true;
         
         if (num_codigos > 0) {
             int codigo_anterior = codigos[0];
+            
+            // Imprimir primera secuencia
             for (unsigned int color : dict_lzw[codigo_anterior]) {
-                imprimir_pixel(color);
+                if (!primera_linea && pixeles_impresos % m == 0) cout << "\n";
+                cout << hex << uppercase << setfill('0') << setw(8) << color;
+                if (pixeles_impresos % m != m - 1) cout << " ";
+                pixeles_impresos++;
+                primera_linea = false;
             }
             
+            // Procesar resto de códigos
             for (int i = 1; i < num_codigos; i++) {
                 int codigo_actual = codigos[i];
                 vector<unsigned int> entrada;
                 
                 if (codigo_actual < (int)dict_lzw.size()) {
                     entrada = dict_lzw[codigo_actual];
-                } else {
+                } else if (codigo_actual == (int)dict_lzw.size()) {
+                    // Caso especial: código que aún no existe en el diccionario
                     entrada = dict_lzw[codigo_anterior];
                     entrada.push_back(dict_lzw[codigo_anterior][0]);
+                } else {
+                    // Error - código inválido
+                    continue;
                 }
                 
+                // Imprimir entrada
                 for (unsigned int color : entrada) {
-                    imprimir_pixel(color);
+                    if (!primera_linea && pixeles_impresos % m == 0) cout << "\n";
+                    cout << hex << uppercase << setfill('0') << setw(8) << color;
+                    if (pixeles_impresos % m != m - 1) cout << " ";
+                    pixeles_impresos++;
+                    primera_linea = false;
                 }
                 
-                if (dict_lzw.size() < 1048576) {
+                // Agregar nuevo patrón al diccionario
+                if (dict_lzw.size() < 2097152) {
                     vector<unsigned int> nueva_entrada = dict_lzw[codigo_anterior];
                     nueva_entrada.push_back(entrada[0]);
                     dict_lzw.push_back(nueva_entrada);
@@ -143,6 +174,8 @@ int main() {
                 
                 codigo_anterior = codigo_actual;
             }
+            
+            if (pixeles_impresos % m != 0) cout << "\n";
         }
     }
     return 0;
