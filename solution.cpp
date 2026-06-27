@@ -30,14 +30,19 @@ int main() {
             colores_unicos.insert(color);
         }
         
-        // Crear diccionario de colores únicos
         vector<unsigned int> diccionario(colores_unicos.begin(), colores_unicos.end());
+        map<unsigned int, int> color_a_idx;
+        for (size_t i = 0; i < diccionario.size(); i++) {
+            color_a_idx[diccionario[i]] = i;
+        }
         
-        // Output: solo dos líneas
         cout << diccionario.size() << "\n";
         for (size_t i = 0; i < diccionario.size(); i++) {
             cout << diccionario[i];
             if (i < diccionario.size() - 1) cout << " ";
+        }
+        for (int i = 0; i < total; i++) {
+            cout << " " << color_a_idx[pixeles[i]];
         }
         cout << "\n";
         
@@ -45,20 +50,21 @@ int main() {
         int n, m, k;
         cin >> n >> m >> k;
         
-        vector<unsigned int> diccionario(k);
-        for (int i = 0; i < k; i++) {
-            cin >> diccionario[i];
-        }
-        
+        vector<unsigned int> colores(k);
         vector<int> indices(n * m);
-        for (int i = 0; i < n * m; i++) {
-            cin >> indices[i];
+        
+        for (int i = 0; i < k + n * m; i++) {
+            if (i < k) {
+                cin >> colores[i];
+            } else {
+                cin >> indices[i - k];
+            }
         }
         
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < m; j++) {
                 int idx = i * m + j;
-                cout << hex << uppercase << setfill('0') << setw(8) << diccionario[indices[idx]];
+                cout << hex << uppercase << setfill('0') << setw(8) << colores[indices[idx]];
                 if (j < m - 1) cout << " ";
             }
             cout << "\n";
